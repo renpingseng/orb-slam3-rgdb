@@ -262,6 +262,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         float thresh = fsSettings["thresh"];
 
         mpPointCloudMapping = new PointCloudMapping(resolution, meank, thresh);
+        mpPointCloudMapping->startViewer();
         mpLocalMapper->SetPointCloudMapper(mpPointCloudMapping);
         mpLoopCloser->SetPointCloudMapper(mpPointCloudMapping);
         mpTracker->SetPointCloudMapper(mpPointCloudMapping);
@@ -621,7 +622,8 @@ void System::Shutdown()
         Verbose::PrintMess("Atlas saving to file " + mStrSaveAtlasToFile, Verbose::VERBOSITY_NORMAL);
         SaveAtlas(FileType::BINARY_FILE);
     }
-
+    mpPointCloudMapping->shutdown();
+    cout << "PointCloudMapping Shutdown" << endl;
     /*if(mpViewer)
         pangolin::BindToContext("ORB-SLAM2: Map Viewer");*/
 

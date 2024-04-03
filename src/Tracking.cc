@@ -1350,7 +1350,7 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings)
     bool b_miss_params = false;
 
     cv::Mat cvTbc;
-    cv::FileNode node = fSettings["Tbc"];
+    cv::FileNode node = fSettings["IMU.Tbc"];
     if(!node.empty())
     {
         cvTbc = node.mat();
@@ -1370,7 +1370,7 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings)
     Eigen::Matrix<float,4,4,Eigen::RowMajor> eigTbc(cvTbc.ptr<float>(0));
     Sophus::SE3f Tbc(eigTbc);
 
-    node = fSettings["InsertKFsWhenLost"];
+    node = fSettings["IMU.InsertKFsWhenLost"];
     mInsertKFsLost = true;
     if(!node.empty() && node.isInt())
     {

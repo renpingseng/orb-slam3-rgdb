@@ -9,8 +9,8 @@ ENDIF()
 
 MESSAGE("Build type: " ${ROS_BUILD_TYPE})
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall  -O3 -march=native ")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall  -O3 -march=native")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall  -O3  ")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall  -O3 ")
 
 # Check C++11 or C++0x support
 include(CheckCXXCompilerFlag)
@@ -39,6 +39,7 @@ find_package(OpenCV 3.2)
 
 find_package(Eigen3 3.1.0 REQUIRED)
 find_package(Pangolin REQUIRED)
+find_package(PCL REQUIRED)    
 
 include_directories(
 ${PROJECT_SOURCE_DIR}
@@ -47,7 +48,11 @@ ${PROJECT_SOURCE_DIR}/../../../include
 ${PROJECT_SOURCE_DIR}/../../../include/CameraModels
 ${PROJECT_SOURCE_DIR}/../../../Thirdparty/Sophus
 ${Pangolin_INCLUDE_DIRS}
+${PCL_INCLUDE_DIRS}     
 )
+
+add_definitions(  ${PCL_DEFINITIONS} )    
+link_directories(  ${PCL_LIBRARY_DIRS} ) 
 
 set(LIBS 
 ${OpenCV_LIBS} 
@@ -95,6 +100,15 @@ src/ros_rgbd.cc
 )
 
 target_link_libraries(RGBD
+${LIBS}
+)
+
+# Node for RGB-D-inertial camera
+rosbuild_add_executable(RGBD_Inertial
+src/ros_rgbd_inertial.cc
+)
+
+target_link_libraries(RGBD_Inertial
 ${LIBS}
 )
 

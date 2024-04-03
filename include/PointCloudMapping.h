@@ -55,6 +55,7 @@ public:
     void updatecloud(Map &curMap);
     void Clear();
     bool bStop = false;
+    void startViewer();
 
     // 关于更新时的变量
     std::atomic<bool> mabIsUpdating;

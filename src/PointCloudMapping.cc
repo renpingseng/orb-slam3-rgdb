@@ -24,7 +24,8 @@
 #include <pcl/filters/statistical_outlier_removal.h>
 #include "Converter.h"
 #include "System.h"
-
+#include <pcl/io/pcd_io.h>
+#include <future>  // 引入并发相关的头文件
 #include<sys/time.h>
 namespace ORB_SLAM3
 {
@@ -43,8 +44,19 @@ PointCloudMapping::PointCloudMapping(double resolution_, double meank_, double t
     voxel->setLeafSize(resolution, resolution, resolution);
     globalMap = pcl::PointCloud<pcl::PointXYZRGBA>::Ptr(new pcl::PointCloud<pcl::PointXYZRGBA>);
 
-    viewerThread = make_shared<thread>(bind(&PointCloudMapping::viewer, this));
+    // viewerThread = make_shared<thread>(bind(&PointCloudMapping::viewer, this));
+    // 初始化线程，但不启动  
+    // viewerThread = std::make_shared<std::thread>();
 }
+
+void PointCloudMapping::startViewer() 
+{   
+    viewerThread = make_shared<thread>(bind(&PointCloudMapping::viewer, this));
+    // // 仅在线程尚未启动时启动线程  
+    // if (!viewerThread->joinable()) {  
+    //     viewerThread.reset(new std::thread(&PointCloudMapping::viewer, this));  
+    // }  
+}  
 
 void PointCloudMapping::shutdown()
 {
@@ -62,8 +74,8 @@ void PointCloudMapping::Clear()
     std::unique_lock<std::mutex> lck(mMutexGlobalMap);
     globalMap.reset(new pcl::PointCloud<pcl::PointXYZRGBA>);
 }
-void PointCloudMapping::insertKeyFrame(KeyFrame *kf, cv::Mat &color, cv::Mat &depth, int idk, vector<KeyFrame *> vpKFs)
-{
+// void PointCloudMapping::insertKeyFrame(KeyFrame *kf, cv::Mat &color, cv::Mat &depth, int idk, vector<KeyFrame *> vpKFs)
+// {
     // cout << "receive a keyframe, 第" << kf->mnId << "个" << endl;
     // if (color.empty())
     //     return;
@@ -77,7 +89,7 @@ void PointCloudMapping::insertKeyFrame(KeyFrame *kf, cv::Mat &color, cv::Mat &de
     // kf->mptrPointCloud = pointcloude.pcE;
     // pointcloud.push_back(pointcloude);
     // keyFrameUpdated.notify_one();
-}
+// }
 
 void PointCloudMapping::insertKeyFrame(KeyFrame *kf)
 {
@@ -107,9 +119,9 @@ void PointCloudMapping::generatePointCloud(KeyFrame *kf) //,Eigen::Isometry3d T
             p.x = (n - kf->cx) * p.z / kf->fx;
             p.y = (m - kf->cy) * p.z / kf->fy;
 
-            p.b = kf->imLeftRgb.ptr<uchar>(m)[n * 3];
+            p.r = kf->imLeftRgb.ptr<uchar>(m)[n * 3];
             p.g = kf->imLeftRgb.ptr<uchar>(m)[n * 3 + 1];
-            p.r = kf->imLeftRgb.ptr<uchar>(m)[n * 3 + 2];
+            p.b = kf->imLeftRgb.ptr<uchar>(m)[n * 3 + 2];
 
             pPointCloud->points.push_back(p);
         }
@@ -122,7 +134,8 @@ void PointCloudMapping::generatePointCloud(KeyFrame *kf) //,Eigen::Isometry3d T
 
 void PointCloudMapping::viewer()
 {
-    pcl::visualization::CloudViewer viewer("viewer");
+    pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer("Point Cloud Viewer"));
+    // viewer->setUseVbos(true);
     // KeyFrame * pCurKF;
     while (1)
     {
@@ -179,14 +192,14 @@ void PointCloudMapping::viewer()
             // transformPointCloudTime += finish.tv_sec - start.tv_sec + (finish.tv_usec - start.tv_usec)/1000000.0;
         }
         // gettimeofday(&start,NULL);
-        pcl::PointCloud<pcl::PointXYZRGBA>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZRGBA>);
+        // pcl::PointCloud<pcl::PointXYZRGBA>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZRGBA>);
 
         // 去除孤立点这个比较耗时，用处也不是很大，可以去掉
         // statistical_filter->setInputCloud(globalMap);  
         // statistical_filter->filter(*tmp);
 
-        voxel->setInputCloud(globalMap);
-        voxel->filter(*globalMap);
+        // voxel->setInputCloud(globalMap);
+        // voxel->filter(*globalMap);
         // gettimeofday(&finish,NULL);//初始化结束时间
         // double filter = finish.tv_sec - start.tv_sec + (finish.tv_usec - start.tv_usec)/1000000.0;//转换浮点型
         // std::cout<<"filter: "<<filter<<std::endl;
@@ -194,19 +207,31 @@ void PointCloudMapping::viewer()
         // std::cout<<"generatePointCloudTime: "<<generatePointCloudTime<<std::endl;
         // std::cout<<"transformPointCloudTime: "<<transformPointCloudTime<<std::endl;
         // gettimeofday(&start,NULL);
-        viewer.showCloud(globalMap);  // 这个比较费时，建议不需要实时显示的可以屏蔽或改成几次显示一次
+        viewer->addPointCloud(globalMap, "global_map");
+        // viewer->showCloud(globalMap);  // 这个比较费时，建议不需要实时显示的可以屏蔽或改成几次显示一次
+        // while (!viewer->wasStopped()) {
+        viewer->spinOnce(100);
+        // std::this_thread::sleep_for(std::chrono::milliseconds(100));    
+        // }
         // gettimeofday(&finish,NULL);//初始化结束时间
         // double duration = finish.tv_sec - start.tv_sec + (finish.tv_usec - start.tv_usec)/1000000.0;//转换浮点型
         // std::cout<<"showCloud: "<<duration<<std::endl;
     }
+    save();
 }
 
 // 保存地图的函数，需要的自行调用~
 void PointCloudMapping::save()
 {
     std::unique_lock<std::mutex> lck(mMutexGlobalMap);
-    pcl::io::savePCDFile("result.pcd", *globalMap);
-    cout << "globalMap save finished" << endl;
+    if(globalMap && !globalMap->points.empty()){
+        pcl::io::savePCDFileBinary("result.pcd", *globalMap);
+        cout << "globalMap save finished" << endl;
+    }else {  
+    // 处理智能指针为空的情况  
+    std::cerr << "globalMap is null! || globalMap is empty" << std::endl;  
+}
+    
 }
 void PointCloudMapping::updatecloud(Map &curMap)
 {
